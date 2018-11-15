@@ -1,11 +1,16 @@
 #!/usr/bin/python3
 import docker
-import os.path
+import os
 import json
 import time
+from slackclient import SlackClient
+
 
 client = docker.APIClient(base_url='unix://var/run/docker.sock')
 docker_file_location = '/usr/bin/docker'
+slack_token = "SLACK_API_TOKEN"
+sc = SlackClient(slack_token)
+
 
 def main():
   if queryFileLocation():
@@ -22,12 +27,19 @@ def queryFileLocation():
 
 def queryStatusContainer():
     for container in client.containers():
+      healthyStatus = None
       try:
         healthyStatus = client.inspect_container(container['Id'])['State']['Health']['Status']
+      finally:
         if healthyStatus != "healthy":
           client.restart(container['Id'])
-      except:
-        pass
+          if slack_token != "SLACK_API_TOKEN":
+            sc.api_call(
+              "chat.postMessage",
+              channel="zabbix_monitor",
+              text="Container {} was unhealthy.".format(container['Names']),
+              user="PythonScript"
+              )
  
     
 if __name__ == '__main__':
